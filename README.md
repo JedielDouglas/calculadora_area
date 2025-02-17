@@ -55,7 +55,7 @@ Além disso, há a inclusão da biblioteca "ws2818b.pio.h", que é gerada durant
 // Biblioteca gerada pelo arquivo .pio durante compilação.
 #include "ws2818b.pio.h"
 ```
-**2. Definições:** Define constantes para os pinos do I2C (SDA no pino 14 e SCL no 15), para os botões (A no pino 5 e B no 6) e para os LEDs (verde, azul e vermelho nos pinos 11, 12 e 13, respectivamente). Também são definidas variáveis globais para armazenar os valores da base e da altura, e outras constantes relacionadas a tempo e dimensões do display.
+**2. Definições e Configurações:** Define constantes para os pinos do I2C (SDA no pino 14 e SCL no 15), para os botões (A no pino 5 e B no 6) e para os LEDs (verde, azul e vermelho nos pinos 11, 12 e 13, respectivamente). Também são definidas variáveis globais para armazenar os valores da base e da altura, e outras constantes relacionadas a tempo e dimensões do display.
 ```c
 const uint I2C_SDA = 14;
 const uint I2C_SCL = 15;
@@ -251,7 +251,13 @@ void apaga(uint8_t r, uint8_t g, uint8_t b) {
     npWrite();
 }
 ```
-**4. Função display_text:** responsável por exibir mensagens no display OLED.
+**4. Função display_text** 
+
+A função display_text é responsável por exibir mensagens no display OLED. Onde ela:
+- Define uma área de renderização (frame_area) que cobre todo o display.
+- Calcula o tamanho necessário do buffer para essa área.
+- Zera o buffer (preenchendo com zeros) e desenha até quatro linhas de texto em posições fixas (por exemplo, y = 8, 38, 48 e 58).
+- Chama render_on_display para atualizar o display e espera 100 ms para garantir a atualização visual.
 ```c
 // Exibe um texto no display OLED
 void display_text(const char *text1, const char *text2, const char *text3, const char *text4) {
@@ -278,7 +284,14 @@ void display_text(const char *text1, const char *text2, const char *text3, const
     sleep_ms(100); // Pequeno atraso para garantir atualização
 }
 ```
-**5. Configuração dos Botões e Leitura dos Valores:** A função init_gpio configura os pinos dos botões A e B como entrada com resistor de pull-up. As funções get_base e get_height são responsáveis por ler os valores digitados pelo usuário.
+**5. Configuração dos Botões e Leitura dos Valores:** 
+
+A função init_gpio configura os pinos dos botões A e B como entrada com resistor de pull-up. 
+
+As funções get_base e get_height são responsáveis por ler os valores digitados pelo usuário:
+- Ambas exibem uma mensagem inicial solicitando o valor (base ou altura) e aguardam a ação do usuário.
+- Quando o botão A é pressionado (gpio_get retorna 0, pois há pull-up), o valor é incrementado e uma mensagem é exibida com o novo valor.
+- Quando o botão B é pressionado, o valor atual é "salvo" (confirmado), uma mensagem de confirmação é exibida e a função retorna o valor após um atraso de 3 segundos.
 ```c
 // Inicializa os GPIOs dos botões
 void init_gpio() {
@@ -336,7 +349,18 @@ int get_height() {
     }
 }
 ```
-**6. Função principal (main)**
+**6. Função principal (main):** 
+Na função main, o fluxo do programa funciona da seguinte forma:
+
+- Inicializa a comunicação padrão (stdio) e configura os GPIOs dos botões.
+- Inicializa a comunicação I2C e configura os pinos SDA e SCL para o display OLED, além de habilitar os pull-ups.
+- Inicializa o display OLED chamando ssd1306_init e exibe uma mensagem de boas-vindas ("Calculadora de Area").
+- Inicializa a matriz de LEDs (npInit) e a limpa com npClear.
+- Exibe dois desenhos iniciais: primeiro o quadrado (com cor verde, parâmetros 0,160,0) por 2 segundos e depois o "triângulo" (com cor azul, parâmetros 0,0,160) por 2 segundos. Em seguida, apaga a matriz.
+- Chama get_base e get_height para obter os valores de base e altura do usuário.
+- Calcula a área do retângulo (base * altura) e a área do triângulo (metade da área do retângulo).
+- Prepara mensagens com os resultados e exibe no display OLED.
+- Entra em um loop infinito onde alterna novamente os desenhos na matriz de LEDs (quadrado e triangulo) a cada 2 segundos, proporcionando uma exibição contínua dos símbolos das áreas calculadas.
 ```c
 // Função principal
 int main() {
@@ -737,74 +761,6 @@ int main() {
     
 }
 ```
-## Arquivo CMake
-Além do arquivo em C (extensão .c), é necessário configurar um arquivo CMake para compilar e executar o programa na Raspberry Pi Pico. Esse arquivo define as configurações de build do projeto, como as bibliotecas que serão usadas, os arquivos de origem e as especificações do sistema. Aqui está um exemplo do CMakeLists.txt para este projeto:
+## O vídeo de demonstração do funcionamento do código na placa pode ser acessado no link abaixo:
+https://drive.google.com/file/d/1b0W4Djss8ov6PAhjsvUbE55ue-PUtAHG/view?usp=drive_link
 
-## CMakeLists.txt
-```c
-# Generated Cmake Pico project file
-
-cmake_minimum_required(VERSION 3.13)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Initialise pico_sdk from installed location
-# (note this can come from environment, CMake cache etc)
-
-# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
-if(WIN32)
-    set(USERHOME $ENV{USERPROFILE})
-else()
-    set(USERHOME $ENV{HOME})
-endif()
-set(sdkVersion 1.5.1)
-set(toolchainVersion 13_2_Rel1)
-set(picotoolVersion 2.0.0)
-set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
-if (EXISTS ${picoVscode})
-    include(${picoVscode})
-endif()
-# ====================================================================================
-set(PICO_BOARD pico_w CACHE STRING "Board type")
-
-# Pull in Raspberry Pi Pico SDK (must be before project)
-include(pico_sdk_import.cmake)
-
-project(area C CXX ASM)
-
-# Initialise the Raspberry Pi Pico SDK
-pico_sdk_init()
-
-# Add executable. Default name is the project name, version 0.1
-
-add_executable(area area.c inc/ssd1306_i2c.c)
-
-pico_set_program_name(area "area")
-pico_set_program_version(area "0.1")
-
-# Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(area 0)
-pico_enable_stdio_usb(area 1)
-
-# Add the standard library to the build
-target_link_libraries(area
-        pico_stdlib)
-
-# Add the standard include files to the build
-target_include_directories(area PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
-)
-
-# Add any user requested libraries
-target_link_libraries(area 
-        hardware_gpio
-        hardware_i2c
-        hardware_adc
-        hardware_pio
-        )
-
-pico_add_extra_outputs(area)
-
-```
